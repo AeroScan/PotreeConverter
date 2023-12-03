@@ -28,7 +28,7 @@ set(HEADER_FILES
 	./Converter/modules/unsuck/unsuck.hpp
 )
 
-add_executable(PotreeConverter 
+add_library(PotreeConverter 
 	./Converter/src/chunker_countsort_laszip.cpp
 	./Converter/src/indexer.cpp 
 	./Converter/src/main.cpp
@@ -51,6 +51,7 @@ target_link_libraries(PotreeConverter brotlidec-static)
 target_include_directories(PotreeConverter PRIVATE "./Converter/include")
 target_include_directories(PotreeConverter PRIVATE "./Converter/modules")
 target_include_directories(PotreeConverter PRIVATE "./Converter/libs")
+target_include_directories(PotreeConverter PUBLIC "./include")
 
 
 if (UNIX)

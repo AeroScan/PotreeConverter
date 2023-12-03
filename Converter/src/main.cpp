@@ -2,6 +2,10 @@
 
 #include <iostream>
 #include <execution>
+#include <map>
+#include <stdexcept>
+#include <PotreeConverter.hpp>
+#include <filesystem>
 
 #include "unsuck/unsuck.hpp"
 #include "chunker_countsort_laszip.h"
@@ -18,37 +22,15 @@
 
 using namespace std;
 
-Options parseArguments(int argc, char** argv) {
-	Arguments args(argc, argv);
+Options parseArguments(map<string,string> args) {
 
-	args.addArgument("source,i,", "Input file(s)");
-	args.addArgument("help,h", "Display help information");
-	args.addArgument("outdir,o", "Output directory");
-	args.addArgument("encoding", "Encoding type \"BROTLI\", \"UNCOMPRESSED\" (default)");
-	args.addArgument("method,m", "Point sampling method \"poisson\", \"poisson_average\", \"random\"");
-	args.addArgument("chunkMethod", "Chunking method");
-	args.addArgument("keep-chunks", "Skip deleting temporary chunks during conversion");
-	args.addArgument("no-chunking", "Disable chunking phase");
-	args.addArgument("no-indexing", "Disable indexing phase");
-	args.addArgument("attributes", "Attributes in output file");
-	args.addArgument("projection", "Add the projection of the pointcloud to the metadata");
-	args.addArgument("generate-page,p", "Generate a ready to use web page with the given name");
-	args.addArgument("title", "Page title used when generating a web page");
 
-	if (args.has("help")) {
-		cout << "PotreeConverter <source> -o <outdir>" << endl;
-		cout << endl << args.usage() << endl;
-		exit(0);
+	if (!args.count("source")) {
+		
+		throw invalid_argument("No source key provided");
 	}
 
-	if (!args.has("source")) {
-		cout << "PotreeConverter <source> -o <outdir>" << endl;
-		cout << endl << "For a list of options, use --help or -h" << endl;
-
-		exit(1);
-	}
-
-	vector<string> source = args.get("source").as<vector<string>>();
+	vector<string> source = {args["source"]};
 
 	if (source.size() == 0) {
 		cout << "PotreeConverter <source> -o <outdir>" << endl;
@@ -57,13 +39,13 @@ Options parseArguments(int argc, char** argv) {
 		exit(1);
 	}
 
-	string encoding = args.get("encoding").as<string>("DEFAULT");
-	string method = args.get("method").as<string>("poisson");
-	string chunkMethod = args.get("chunkMethod").as<string>("LASZIP");
+	string encoding = args.count("encoding") ? args["encoding"] : "DEFAULT"; //.as<string>("DEFAULT");
+	string method = args.count("method") ? args["encoding"] : "poisson";
+	string chunkMethod = args.count("chunkMethod") ? args["chunkMethod"] : "LASZIP";//.as<string>("LASZIP");
 
 	string outdir = "";
-	if (args.has("outdir")) {
-		outdir = args.get("outdir").as<string>();
+	if (args.count("outdir")) {
+		outdir = args["outdir"];
 	} else {
 
 		string sourcepath = source[0];
@@ -74,9 +56,7 @@ Options parseArguments(int argc, char** argv) {
 
 		if (!fs::exists(path)) {
 
-			logger::ERROR("file does not exist: " + source[0]);
-
-			exit(123);
+			throw invalid_argument("file does not exist: " + source[0]);
 		} 
 
 		path = fs::canonical(path);
@@ -104,19 +84,20 @@ Options parseArguments(int argc, char** argv) {
 
 	//vector<string> flags = args.get("flags").as<vector<string>>();
 
-	vector<string> attributes = args.get("attributes").as<vector<string>>();
+	// vector<string> attributes = args.get("attributes").as<vector<string>>();
+	vector<string> attributes = {};
 
-	bool generatePage = args.has("generate-page");
+	bool generatePage = args.count("generate-page");
 	string pageName = "";
 	if (generatePage) {
-		pageName = args.get("generate-page").as<string>();
+		pageName = args.count("generate-page") ? args["generate-page"] : "";
 	}
-	string pageTitle = args.get("title").as<string>();
-	string projection = args.get("projection").as<string>();
+	string pageTitle = args.count("title") ? args["title"] : "";
+	string projection = args.count("projection") ? args["projection"] : "";
 
-	bool keepChunks = args.has("keep-chunks");
-	bool noChunking = args.has("no-chunking");
-	bool noIndexing = args.has("no-indexing");
+	bool keepChunks = args.count("keep-chunks");
+	bool noChunking = args.count("no-chunking");
+	bool noIndexing = args.count("no-indexing");
 
 	Options options;
 	options.source = source;
@@ -494,7 +475,7 @@ void generatePage(string exePath, string pagedir, string pagename) {
 
 #include "HierarchyBuilder.h"
 
-int main(int argc, char** argv) {
+bool potreeConverter(map<string, string> pOptions) {
 
 	
 	// { // DEBUG STUFF
@@ -510,16 +491,19 @@ int main(int argc, char** argv) {
 
 
 
-	double tStart = now(); 
+	double tStart = now();
 
-	auto exePath = fs::canonical(fs::absolute(argv[0])).parent_path().string();
+	if(!pOptions.count("input"))
+		throw invalid_argument("missing input dir");
+
+	auto exePath = fs::canonical(fs::absolute(pOptions["input"])).parent_path().string();
 
 	launchMemoryChecker(2 * 1024, 0.1);
 	auto cpuData = getCpuData();
 
 	cout << "#threads: " << cpuData.numProcessors << endl;
 
-	auto options = parseArguments(argc, argv);
+	auto options = parseArguments(pOptions);
 
 	auto [name, sources] = curateSources(options.source);
 	if (options.name.size() == 0) {
